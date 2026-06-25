@@ -26,7 +26,7 @@ impl GauthStore {
 
     fn save(&self, ini: &Ini) -> Result<()> {
         ini.write_to_file(&self.path)
-            .map_err(|e| StoreError::Io(e))
+            .map_err(StoreError::Io)
     }
 }
 
