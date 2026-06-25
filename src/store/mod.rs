@@ -39,3 +39,33 @@ pub trait SecretStore {
             .code()
     }
 }
+
+use crate::config::{expand_tilde, BackendKind, Config};
+use crate::keepasshttp::KeePassHttpClient;
+
+/// Build the active store from config.
+pub fn open_store(cfg: &Config) -> Result<Box<dyn SecretStore>> {
+    match cfg.backend {
+        BackendKind::Gauth => {
+            Ok(Box::new(gauth::GauthStore::new(expand_tilde(&cfg.gauth.path))))
+        }
+        BackendKind::Macpass => {
+            if cfg.macpass.id.is_empty() || cfg.macpass.key.is_empty() {
+                return Err(StoreError::Auth {
+                    status: 0,
+                    body: "macpass.id/key are empty; run `gauth associate` first".into(),
+                });
+            }
+            let client = KeePassHttpClient::new(
+                cfg.macpass.endpoint.clone(),
+                reqwest::blocking::Client::new(),
+            );
+            Ok(Box::new(macpass::MacpassStore::new(
+                client,
+                cfg.macpass.id.clone(),
+                cfg.macpass.key.clone(),
+                cfg.macpass.marker_url.clone(),
+            )))
+        }
+    }
+}

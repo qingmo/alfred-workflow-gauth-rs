@@ -75,6 +75,6 @@ mod tests {
     #[test]
     fn time_remaining_in_range() {
         let r = time_remaining();
-        assert!(r >= 1 && r <= 30);
+        assert!((1..=30).contains(&r));
     }
 }
