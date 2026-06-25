@@ -1,4 +1,6 @@
 mod account;
+mod alfred;
+mod config;
 mod error;
 mod keepasshttp;
 mod store;
