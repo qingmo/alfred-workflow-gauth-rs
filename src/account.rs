@@ -31,6 +31,11 @@ impl Account {
 
 /// Classify a stored password value: a bare 6-digit string is a live `Code`,
 /// anything else is treated as a base32 `Secret`.
+///
+/// The 6-digit heuristic is safe in practice: real base32 TOTP secrets are
+/// ~16–32 characters and the base32 alphabet includes A–Z, so a valid secret is
+/// never exactly 6 all-decimal-digit characters. Empty or blank input falls
+/// through to `Secret` and will fail later at TOTP time.
 pub fn detect_material(value: &str) -> SecretMaterial {
     let v = value.trim();
     if v.len() == 6 && v.bytes().all(|b| b.is_ascii_digit()) {
@@ -61,6 +66,17 @@ mod tests {
     fn five_or_seven_digits_is_secret() {
         assert!(matches!(detect_material("12345"), SecretMaterial::Secret(_)));
         assert!(matches!(detect_material("1234567"), SecretMaterial::Secret(_)));
+    }
+
+    #[test]
+    fn trims_surrounding_whitespace_for_code() {
+        assert_eq!(detect_material(" 123456 "), SecretMaterial::Code("123456".into()));
+    }
+
+    #[test]
+    fn blank_input_falls_through_to_secret() {
+        // Empty/blank input is treated as a Secret and will fail later at TOTP time.
+        assert!(matches!(detect_material("   "), SecretMaterial::Secret(_)));
     }
 
     #[test]
