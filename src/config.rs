@@ -65,6 +65,8 @@ fn default_endpoint() -> String { "http://127.0.0.1:19455".into() }
 fn default_marker_url() -> String { "gauth://".into() }
 
 /// Expand a leading `~/` to the user's home directory.
+///
+/// Only a leading `~/` is expanded; a bare `~` or `~user/...` is passed through literally.
 pub fn expand_tilde(path: &str) -> PathBuf {
     if let Some(rest) = path.strip_prefix("~/") {
         if let Some(home) = dirs::home_dir() {
@@ -149,6 +151,23 @@ mod tests {
         let cfg = Config::load(f.path()).unwrap();
         assert_eq!(cfg.macpass.id, "the-id");
         assert_eq!(cfg.macpass.key, "the-key");
+    }
+
+    #[test]
+    fn write_association_preserves_comments_and_other_tables() {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        write!(f, "# my config\n[gauth]\npath = \"/tmp/x\"\n").unwrap();
+        Config::write_association(f.path(), "the-id", "the-key").unwrap();
+
+        let text = std::fs::read_to_string(f.path()).unwrap();
+        assert!(text.contains("# my config"));
+        assert!(text.contains("[gauth]"));
+        assert!(text.contains("path = \"/tmp/x\""));
+
+        let cfg = Config::load(f.path()).unwrap();
+        assert_eq!(cfg.macpass.id, "the-id");
+        assert_eq!(cfg.macpass.key, "the-key");
+        assert_eq!(cfg.gauth.path, "/tmp/x");
     }
 
     #[test]
