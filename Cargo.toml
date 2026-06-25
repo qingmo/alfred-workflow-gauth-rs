@@ -1,0 +1,32 @@
+[package]
+name = "gauth"
+version = "0.1.0"
+edition = "2021"
+description = "TOTP generator with pluggable secret stores and Alfred integration"
+
+[[bin]]
+name = "gauth"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+toml_edit = "0.22"
+rust-ini = "0.21"
+dirs = "5"
+thiserror = "1"
+bitflags = "2"
+hmac = "0.12"
+sha1 = "0.10"
+base32 = "0.5"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+base64 = "0.22"
+rand = "0.8"
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+
+[dev-dependencies]
+mockito = "1"
+tempfile = "3"
