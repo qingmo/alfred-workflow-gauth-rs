@@ -53,7 +53,7 @@ impl SecretStore for GauthStore {
     fn add(&mut self, name: &str, secret_b32: &str) -> Result<()> {
         // Validate the secret is usable before persisting (mirrors Python is_otp_secret_valid).
         totp::totp_now(secret_b32)
-            .map_err(|_| StoreError::InvalidSecret(secret_b32.to_string()))?;
+            .map_err(|_| StoreError::InvalidSecret("not a valid base32 TOTP secret".into()))?;
         let mut ini = self.load()?;
         if ini.section(Some(name)).is_some() {
             return Err(StoreError::Parse(format!("account already exists: {name}")));
@@ -107,8 +107,14 @@ mod tests {
     #[test]
     fn add_rejects_invalid_secret() {
         let (_f, mut store) = temp_store("");
-        let err = store.add("aws", "not base32 !!!").unwrap_err();
+        let candidate = "totally-not-base32-SUPERSECRET-9999";
+        let err = store.add("aws", candidate).unwrap_err();
         assert!(matches!(err, StoreError::InvalidSecret(_)));
+        // The candidate secret must never appear in the rendered error (secret hygiene).
+        assert!(
+            !err.to_string().contains(candidate),
+            "error message leaked the candidate secret: {err}"
+        );
     }
 
     #[test]
