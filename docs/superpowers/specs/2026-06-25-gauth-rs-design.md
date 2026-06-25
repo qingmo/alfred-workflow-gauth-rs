@@ -39,7 +39,7 @@ We want a Rust rewrite that:
 | # | Decision | Choice |
 |---|----------|--------|
 | 1 | What a backend returns | **Per-entry enum**: `Secret(base32)` (core computes TOTP) or `Code(6 digits)` (backend already generated it, e.g. MacPass `{TOTP}`). |
-| 2 | Write operations | **Full CRUD where the backend supports it**; capability-aware `Unsupported` otherwise. |
+| 2 | Write operations | **Full CRUD where the backend supports it**; capability-aware `Unsupported` otherwise. *(As built: `gauth` is full CRUD; `macpass` is read-only in v1 — see Backends note.)* |
 | 3 | Backends in v1 | **`gauth` (default) + `macpass`**; trait shaped so `1password` drops in later. |
 | 4 | Binary shape & Alfred format | **Single binary, dual output**: Alfred **JSON** Script Filter mode + plain CLI subcommands. |
 | 5 | MacPass account mapping | **Shared marker URL** (default `gauth://`); account name = entry title; secret-vs-code detected per entry. |
@@ -58,20 +58,24 @@ src/
   totp.rs          # RFC6238 TOTP (ported from luban totp.rs, verbatim + tests)
   alfred.rs        # Alfred JSON Script Filter feedback (serde)
   account.rs       # Account, SecretMaterial, code resolution
+  keepasshttp/       # reusable transport, kept top-level (not macpass-specific)
+    mod.rs           # ported from luban keepasshttp/mod.rs (async -> blocking)
+    crypto.rs        # ported from luban keepasshttp/crypto.rs
   store/
-    mod.rs         # SecretStore trait + StoreError + Caps + factory
+    mod.rs         # SecretStore trait + Caps + open_store factory
     gauth.rs       # legacy INI backend (default)
-    macpass/
-      mod.rs       # MacpassStore: maps entries <-> accounts via marker_url
-      keepasshttp.rs  # ported from luban keepasshttp/mod.rs
-      crypto.rs       # ported from luban keepasshttp/crypto.rs
+    macpass.rs     # MacpassStore: maps entries <-> accounts via marker_url
 ```
+
+*(As built, `keepasshttp/` lives at the crate root rather than nested under
+`store/macpass/`, since the KeePassHTTP client is a generic transport reusable
+beyond the macpass backend. `StoreError` lives in its own `src/error.rs`.)*
 
 ### Dependencies
 
 `clap` (derive), `serde` + `serde_json`, `toml` + `toml_edit`, `dirs`,
 `hmac` + `sha1` + `base32` (TOTP), `aes` + `cbc` + `base64` + `rand` (KeePassHTTP),
-`reqwest` (blocking), `anyhow` + `thiserror`, `rust-ini` (`.gauth` backend),
+`reqwest` (blocking), `thiserror` (unified `StoreError`), `rust-ini` (`.gauth` backend),
 `bitflags` (capability flags). Dev: `mockito`, `tempfile`.
 
 ### The `SecretStore` trait
@@ -125,11 +129,12 @@ pub trait SecretStore {
 **`macpass`.** Ported KeePassHTTP stack; requires a one-time `associate`.
 - `list`: single `get-logins(marker_url)`; each returned entry ->
   `Account { name: entry.name, material: detect(entry.password) }`.
-- `add`: best-effort KeePassHTTP `set-login` tagged with `marker_url`; if the
-  MacPass build rejects it, surface a clear "add unsupported on this MacPass
-  build — add it in the app" error.
-- `remove`: `Unsupported` (KeePassHTTP has no delete).
-- Caps: `READ` (+ `ADD` best-effort).
+- `add` / `remove`: **`Unsupported` in v1** — read-only. (KeePassHTTP `set-login`
+  support is inconsistent across MacPass builds and entries are curated in the
+  MacPass app, so v1 doesn't attempt writes. The earlier "best-effort `set-login`"
+  idea was dropped to avoid build-dependent failure modes; add a TOTP entry in the
+  MacPass app and give it the `marker_url`.)
+- Caps: `READ`.
 
 ### Config
 
