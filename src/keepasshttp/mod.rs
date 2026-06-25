@@ -111,6 +111,7 @@ impl KeePassHttpClient {
     }
 
     /// Verify a stored association is still valid.
+    // TODO: wire to a future `gauth associate --check` subcommand; kept as tested public API.
     #[allow(dead_code)]
     pub fn test_associate(&self, id: &str, key_b64: &str) -> Result<bool> {
         let nonce_b64 = crypto::b64(&crypto::random_bytes(16));
