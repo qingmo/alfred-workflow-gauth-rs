@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "gauth", about = "TOTP generator with pluggable secret stores")]
+#[command(name = "gauth", version, about = "TOTP generator with pluggable secret stores")]
 pub struct Cli {
     /// Path to the config file (default: ~/.config/gauth/config.toml).
     #[arg(long, global = true)]

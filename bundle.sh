@@ -30,6 +30,14 @@ cp "$SRC/icon.png" "$SRC/warning.png" "$SRC/time.png" "$SRC/error.png" "$STAGE/"
 cp "$BIN" "$STAGE/gauth"
 chmod +x "$STAGE/gauth"
 
+# Stamp the crate version into the bundled plist so the workflow version always
+# matches the binary it ships (keeps Cargo.toml as the single source of truth).
+VERSION="$("$BIN" --version 2>/dev/null | awk '{print $NF}')"
+if [ -n "$VERSION" ]; then
+	echo "==> Stamping workflow version $VERSION"
+	plutil -replace version -string "$VERSION" "$STAGE/info.plist"
+fi
+
 echo "==> Zipping $OUT"
 rm -f "$OUT"
 # Zip the staged contents at the archive root (Alfred expects info.plist at top level).

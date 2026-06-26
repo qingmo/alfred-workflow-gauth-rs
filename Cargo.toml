@@ -1,6 +1,6 @@
 [package]
 name = "gauth"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "TOTP generator with pluggable secret stores and Alfred integration"
 
