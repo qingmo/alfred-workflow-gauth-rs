@@ -3,73 +3,122 @@
 A Rust TOTP generator with pluggable secret stores and Alfred integration.
 A modern rewrite of [moul/alfred-workflow-gauth](https://github.com/moul/alfred-workflow-gauth).
 
-## Backends
+- **Pluggable storage** behind a `SecretStore` trait: a legacy plaintext `~/.gauth`
+  INI (default) or a **MacPass** vault over KeePassHTTP (secrets stay encrypted).
+- **Dual surface:** a plain CLI (`list` / `code` / `add` / `remove` / `associate`)
+  and an Alfred Script Filter (`alfred`) emitting JSON.
 
-- `gauth` (default): legacy `~/.gauth` INI (`[account]` + `secret = <base32>`).
-- `macpass`: MacPass via the KeePassHTTP/MacPassHTTP plugin (secrets stay in the vault).
+➡️ **Configuring and using it day-to-day: see [USAGE.md](USAGE.md).**
+This README covers building from source and packaging the Alfred workflow.
 
-## Config
+---
 
-`~/.config/gauth/config.toml` (optional — defaults to the `gauth` backend):
+## Build from source
 
-```toml
-backend = "macpass"          # "gauth" (default) | "macpass"
-
-[gauth]
-path = "~/.gauth"
-
-[macpass]
-endpoint = "http://127.0.0.1:19455"
-marker_url = "gauth://"      # shared URL on every gauth-managed MacPass entry
-id = ""                      # filled by `gauth associate`
-key = ""                     # filled by `gauth associate`
-```
-
-## Usage
+Requires a Rust toolchain (stable). On macOS:
 
 ```bash
-gauth list                   # accounts + current codes
-gauth code <name>            # print one code (scripting)
-gauth add <name> <secret>    # add (gauth backend)
-gauth remove <name>          # remove (gauth backend)
-gauth associate              # one-time MacPass association handshake
-gauth alfred "<query>"       # Alfred Script Filter JSON
-gauth --config <path> ...    # use an alternate config file (global flag)
+cargo build --release        # produces target/release/gauth
+cargo test                   # run the test suite
+cargo clippy --all-targets   # lints
 ```
 
-## MacPass setup
-
-1. Set `backend = "macpass"`, run MacPass with the MacPassHTTP plugin.
-2. `gauth associate` and approve the dialog (writes `id`/`key` to the config).
-3. Give each TOTP entry the URL `gauth://` (the `marker_url`) and store either the
-   base32 secret or a `{TOTP}` placeholder in the password field.
-
-## Alfred workflow
-
-### Quick build
+The result is a single self-contained binary at `target/release/gauth`.
 
 ```bash
-./bundle.sh        # compiles the release binary + zips GAuth.alfredworkflow
-open GAuth.alfredworkflow   # import into Alfred
+# Optionally install onto your PATH for terminal use:
+cp target/release/gauth /usr/local/bin/   # or: cargo install --path .
 ```
 
-`bundle.sh` builds `target/release/gauth`, validates `alfred/info.plist`, and
-packages the binary + icons into an importable `GAuth.alfredworkflow`. The bundled
-binary is architecture-specific — rebuild on each Mac you install it on.
+---
 
-Then type `gauth ` in Alfred, optionally followed by part of an account name, and
-press Enter to paste the current code at the cursor. The code is copied as a
-*transient* clipboard item (kept out of clipboard history) and auto-pasted
-(requires granting Alfred Accessibility permission).
+## Package the Alfred workflow
 
-### How it's wired
+`bundle.sh` turns the project into an importable `.alfredworkflow` file:
 
-The workflow (`alfred/info.plist`) is a Script Filter that runs
-`./gauth alfred "{query}"`, where `{query}` is the text typed into Alfred (used to
-filter accounts by name). Each result item carries its current code in its `arg`.
-The Script Filter connects to a Copy-to-Clipboard output (auto-paste, transient)
-that pastes the selected item's `arg` — the code — at the cursor.
+```bash
+./bundle.sh
+```
 
-> Input mode: the Script Filter uses `{query}` substitution. If your Alfred build
-> expects argv instead, open the Script Filter and switch the input to argv with
-> script `./gauth alfred "$1"`.
+This:
+
+1. builds the release binary (`cargo build --release`),
+2. validates `alfred/info.plist` with `plutil -lint`,
+3. stages the binary + icons + plist, and
+4. zips them into **`GAuth.alfredworkflow`** at the repo root.
+
+Install it by double-clicking, or:
+
+```bash
+open GAuth.alfredworkflow
+```
+
+### What goes in the bundle
+
+```
+GAuth.alfredworkflow   (a zip; info.plist must be at the archive root)
+├── info.plist         # workflow definition (from alfred/info.plist)
+├── gauth              # the release binary (architecture-specific)
+├── icon.png           # account-item & workflow icon
+├── time.png           # "time remaining" item icon
+├── warning.png        # warning/error item icon
+└── error.png          # (reserved)
+```
+
+The source assets live in `alfred/`; the binary is injected by `bundle.sh`.
+`GAuth.alfredworkflow` itself is **git-ignored** because it embeds the compiled,
+architecture-specific binary — regenerate it with `bundle.sh` on each machine.
+
+### How the workflow is wired
+
+`alfred/info.plist` defines two connected objects:
+
+1. **Script Filter** (keyword `gauth`, `with space`) runs `./gauth alfred "{query}"`
+   from the workflow directory — where the bundled `gauth` binary sits — and Alfred
+   renders the JSON it prints. `{query}` is the typed text, used to filter accounts.
+2. **Copy to Clipboard** (auto-paste, **transient**) receives the selected item's
+   `arg` (the 6-digit code) and pastes it at the cursor. Transient means the code
+   is not retained in clipboard history.
+
+> **Input mode caveat.** The Script Filter uses `{query}` substitution
+> (`scriptargtype = 0`). If your Alfred build expects argv, open the Script Filter
+> and switch the input to argv with script `./gauth alfred "$1"`.
+
+### Distribution notes
+
+- The bundled binary is built for the **current CPU architecture** (e.g. Apple
+  Silicon vs Intel). To share the workflow across architectures, rebuild on each,
+  or ship a universal binary (`lipo`) — out of scope for v1.
+- Auto-paste requires the user to grant **Alfred Accessibility permission**.
+- Icons are reused from the original MIT-licensed `moul/alfred-workflow-gauth`.
+
+---
+
+## Project layout
+
+```
+src/
+  totp.rs              # RFC6238 TOTP (ported from luban-mcp-server)
+  account.rs           # SecretMaterial {Secret|Code}, Account, code resolution
+  error.rs             # unified StoreError
+  keepasshttp/         # blocking KeePassHTTP client (mod.rs + crypto.rs)
+  store/
+    mod.rs             # SecretStore trait + Caps + open_store factory
+    gauth.rs           # legacy INI backend (default, full CRUD)
+    macpass.rs         # MacPass backend (read-only v1)
+  config.rs            # TOML config + association write-back
+  alfred.rs            # Alfred Script Filter JSON
+  cli.rs / main.rs     # clap CLI + dispatch
+alfred/                # info.plist + icons (workflow source assets)
+bundle.sh              # build + package GAuth.alfredworkflow
+docs/superpowers/      # design spec & implementation plan
+```
+
+Design rationale and the implementation plan are under
+[`docs/superpowers/`](docs/superpowers/).
+
+---
+
+## License
+
+MIT (icons inherited from the original MIT-licensed project).
