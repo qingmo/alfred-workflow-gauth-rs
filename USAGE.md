@@ -125,15 +125,19 @@ protocol provided by the **MacPassHTTP** plugin.
    backend = "macpass"
    ```
 
-3. **Associate once** so `gauth` and MacPass share an encryption key:
+3. **Associate once** so `gauth` and MacPass share an encryption key. This is the
+   only step that needs a terminal. Run the binary — either the one the workflow
+   already built, or a `gauth` you've installed on your `PATH` (see the README's
+   "Using `gauth` in a terminal" section):
 
    ```bash
-   gauth associate
+   ./target/release/gauth associate     # from the repo, or just: gauth associate
    ```
 
    MacPass pops a dialog asking you to name/approve the association. On approval,
    `gauth` writes the resulting `id` and `key` into `[macpass]` in your config
-   (your existing comments and other settings are preserved).
+   (your existing comments and other settings are preserved). The workflow's
+   bundled binary then reads that same config — no rebuild needed.
 
 4. **Tag your TOTP entries.** For each account you want `gauth` to see, create an
    entry in MacPass and set its **URL** to the `marker_url` (`gauth://` by

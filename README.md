@@ -9,49 +9,30 @@ A modern rewrite of [moul/alfred-workflow-gauth](https://github.com/moul/alfred-
   and an Alfred Script Filter (`alfred`) emitting JSON.
 
 ➡️ **Configuring and using it day-to-day: see [USAGE.md](USAGE.md).**
-This README covers building from source and packaging the Alfred workflow.
+This README covers building and packaging the self-contained Alfred workflow.
 
 ---
 
-## Build from source
+## Install the workflow (one step)
 
-Requires a Rust toolchain (stable). On macOS:
-
-```bash
-cargo build --release        # produces target/release/gauth
-cargo test                   # run the test suite
-cargo clippy --all-targets   # lints
-```
-
-The result is a single self-contained binary at `target/release/gauth`.
+The workflow is **fully self-contained**: the `gauth` binary is packaged *inside*
+the `.alfredworkflow`, and the Script Filter runs it via the relative path
+`./gauth`. You do **not** install anything onto your `PATH` — importing the
+workflow is all that's needed.
 
 ```bash
-# Optionally install onto your PATH for terminal use:
-cp target/release/gauth /usr/local/bin/   # or: cargo install --path .
+./bundle.sh            # build + package GAuth.alfredworkflow
+open GAuth.alfredworkflow   # import into Alfred
 ```
 
----
-
-## Package the Alfred workflow
-
-`bundle.sh` turns the project into an importable `.alfredworkflow` file:
-
-```bash
-./bundle.sh
-```
-
-This:
+`bundle.sh`:
 
 1. builds the release binary (`cargo build --release`),
 2. validates `alfred/info.plist` with `plutil -lint`,
 3. stages the binary + icons + plist, and
 4. zips them into **`GAuth.alfredworkflow`** at the repo root.
 
-Install it by double-clicking, or:
-
-```bash
-open GAuth.alfredworkflow
-```
+That's it. With the default `~/.gauth` backend you never touch a terminal again.
 
 ### What goes in the bundle
 
@@ -91,6 +72,40 @@ architecture-specific binary — regenerate it with `bundle.sh` on each machine.
   or ship a universal binary (`lipo`) — out of scope for v1.
 - Auto-paste requires the user to grant **Alfred Accessibility permission**.
 - Icons are reused from the original MIT-licensed `moul/alfred-workflow-gauth`.
+
+---
+
+## Using `gauth` in a terminal (optional)
+
+The Alfred workflow needs no terminal. You only want a terminal `gauth` for two
+things: the **MacPass `associate`** handshake, and ad-hoc scripting
+(`gauth code github | pbcopy`). If you use the default `~/.gauth` backend, skip
+this entirely.
+
+Either run the binary the bundle already built:
+
+```bash
+./target/release/gauth associate
+```
+
+…or install it onto your `PATH` so it's available everywhere:
+
+```bash
+cargo install --path .     # installs `gauth` into ~/.cargo/bin
+# or: cp target/release/gauth /usr/local/bin/
+```
+
+This terminal binary and the one inside the workflow are the same program reading
+the same `~/.config/gauth/config.toml` — installing to `PATH` is a convenience, not
+a requirement for the workflow.
+
+## Develop
+
+```bash
+cargo test                   # run the test suite
+cargo clippy --all-targets   # lints
+cargo build --release        # produce target/release/gauth
+```
 
 ---
 
