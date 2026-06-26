@@ -116,7 +116,7 @@ produces a code before saving it; an invalid secret is rejected without writing.
 MacPass is a macOS KeePass client. `gauth` talks to it over the KeePassHTTP
 protocol provided by the **MacPassHTTP** plugin.
 
-1. **Install & run** MacPass with the MacPassHTTP plugin enabled, and unlock your
+1. **Install & run** MacPass with the [MacPassHTTP](https://github.com/MacPass/MacPassHTTP) plugin enabled, and unlock your
    database. The plugin listens on `http://127.0.0.1:19455` by default.
 
 2. **Select the backend** in `~/.config/gauth/config.toml`:
