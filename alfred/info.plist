@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>bundleid</key>
+	<string>com.chaosmo.gauth-rs</string>
+	<key>category</key>
+	<string>Tools</string>
+	<key>connections</key>
+	<dict>
+		<key>4F7A1C20-0001-4B00-A000-000000000001</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>4F7A1C20-0002-4B00-A000-000000000002</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+	</dict>
+	<key>createdby</key>
+	<string>chaosmo</string>
+	<key>description</key>
+	<string>Generate TOTP / Google Authenticator codes from a pluggable secret store (~/.gauth or MacPass).</string>
+	<key>disabled</key>
+	<false/>
+	<key>name</key>
+	<string>GAuth (Rust)</string>
+	<key>objects</key>
+	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>keyword</key>
+				<string>gauth</string>
+				<key>queuedelaycustom</key>
+				<integer>3</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<true/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string>Generating codes…</string>
+				<key>script</key>
+				<string>./gauth alfred "{query}"</string>
+				<key>scriptargtype</key>
+				<integer>0</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string>Type to filter your 2FA accounts</string>
+				<key>title</key>
+				<string>GAuth</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>4F7A1C20-0001-4B00-A000-000000000001</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>autopaste</key>
+				<true/>
+				<key>clipboardtext</key>
+				<string>{query}</string>
+				<key>ignoredynamicplaceholders</key>
+				<false/>
+				<key>transient</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.clipboard</string>
+			<key>uid</key>
+			<string>4F7A1C20-0002-4B00-A000-000000000002</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+	</array>
+	<key>readme</key>
+	<string>GAuth (Rust) — TOTP / 2FA codes in Alfred.
+
+Setup:
+1. Build the binary: `cargo build --release` in the gauth-rs repo. The bundled
+   `gauth` binary is included by bundle.sh; if you move the workflow to another
+   Mac, rebuild for that architecture.
+2. (Optional) Configure a backend in ~/.config/gauth/config.toml. Defaults to the
+   legacy ~/.gauth INI file. For MacPass, set backend = "macpass" and run
+   `gauth associate` in a terminal once to approve the MacPassHTTP association.
+
+Usage:
+- Type `gauth` then (optionally) part of an account name.
+- Press Enter on a result to paste its current 6-digit code at the cursor.
+
+The selected code is copied as a transient clipboard item (not retained in
+clipboard history) and auto-pasted at the cursor (requires Accessibility
+permission for Alfred).
+
+Note: the Script Filter passes the query via {query} substitution. If your Alfred
+build expects argv instead, open the Script Filter and switch input to argv with
+script `./gauth alfred "$1"`.</string>
+	<key>uidata</key>
+	<dict>
+		<key>4F7A1C20-0001-4B00-A000-000000000001</key>
+		<dict>
+			<key>xpos</key>
+			<real>110</real>
+			<key>ypos</key>
+			<real>110</real>
+		</dict>
+		<key>4F7A1C20-0002-4B00-A000-000000000002</key>
+		<dict>
+			<key>xpos</key>
+			<real>400</real>
+			<key>ypos</key>
+			<real>110</real>
+		</dict>
+	</dict>
+	<key>variablesdontexport</key>
+	<array/>
+	<key>version</key>
+	<string>0.1.0</string>
+	<key>webaddress</key>
+	<string></string>
+</dict>
+</plist>

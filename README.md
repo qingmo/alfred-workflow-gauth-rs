@@ -46,9 +46,30 @@ gauth --config <path> ...    # use an alternate config file (global flag)
 
 ## Alfred workflow
 
-Add a Script Filter that runs `gauth alfred "{query}"`, where `{query}` is the
-text typed into Alfred (used here to filter accounts by name). Each result item
-carries its current code in its `arg`. Connect the Script Filter to a "Copy to
-Clipboard" / "Paste" action that consumes the selected item's `arg` (the code) —
-not `{query}`, which is only the typed input.
-Bundle icons named `icon.png`, `warning.png`, `time.png` in the workflow.
+### Quick build
+
+```bash
+./bundle.sh        # compiles the release binary + zips GAuth.alfredworkflow
+open GAuth.alfredworkflow   # import into Alfred
+```
+
+`bundle.sh` builds `target/release/gauth`, validates `alfred/info.plist`, and
+packages the binary + icons into an importable `GAuth.alfredworkflow`. The bundled
+binary is architecture-specific — rebuild on each Mac you install it on.
+
+Then type `gauth ` in Alfred, optionally followed by part of an account name, and
+press Enter to paste the current code at the cursor. The code is copied as a
+*transient* clipboard item (kept out of clipboard history) and auto-pasted
+(requires granting Alfred Accessibility permission).
+
+### How it's wired
+
+The workflow (`alfred/info.plist`) is a Script Filter that runs
+`./gauth alfred "{query}"`, where `{query}` is the text typed into Alfred (used to
+filter accounts by name). Each result item carries its current code in its `arg`.
+The Script Filter connects to a Copy-to-Clipboard output (auto-paste, transient)
+that pastes the selected item's `arg` — the code — at the cursor.
+
+> Input mode: the Script Filter uses `{query}` substitution. If your Alfred build
+> expects argv instead, open the Script Filter and switch the input to argv with
+> script `./gauth alfred "$1"`.
