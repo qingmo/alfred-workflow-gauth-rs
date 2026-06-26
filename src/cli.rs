@@ -99,15 +99,7 @@ fn build_alfred(config_path: &std::path::Path, query: &str) -> Result<String> {
     let cfg = Config::load(config_path)?;
     let store = open_store(&cfg)?;
     let accounts = store.list()?;
-    let q = query.trim().to_lowercase();
-    let mut items: Vec<Item> = Vec::new();
-    for acc in &accounts {
-        if !q.is_empty() && !acc.name.to_lowercase().contains(&q) {
-            continue;
-        }
-        let code = acc.code()?;
-        items.push(Item::account(&acc.name, &code));
-    }
+    let mut items = account_items(&accounts, query);
     if items.is_empty() {
         items.push(Item::message(
             "Account not found",
@@ -124,14 +116,36 @@ fn build_alfred(config_path: &std::path::Path, query: &str) -> Result<String> {
     Ok(alfred::render(&Feedback { items }))
 }
 
+/// Resolve each account's code independently, filtering by a lowercased substring
+/// of `query`. A bad account (e.g. an unparseable secret) becomes an error item
+/// rather than aborting the whole feed. Pure, for testing.
+fn account_items(accounts: &[crate::account::Account], query: &str) -> Vec<Item> {
+    let q = query.trim().to_lowercase();
+    accounts
+        .iter()
+        .filter(|a| q.is_empty() || a.name.to_lowercase().contains(&q))
+        .map(|a| match a.code() {
+            Ok(code) => Item::account(&a.name, &code),
+            Err(e) => Item::error(&a.name, &e.to_string()),
+        })
+        .collect()
+}
+
 fn list(cfg: &Config) -> Result<String> {
     let store = open_store(cfg)?;
-    let mut lines = Vec::new();
-    for acc in store.list()? {
-        let code = acc.code()?;
-        lines.push(format!("{:<24} {code}", acc.name));
-    }
-    Ok(lines.join("\n"))
+    Ok(list_lines(&store.list()?).join("\n"))
+}
+
+/// Render one line per account, resolving each code independently so one bad entry
+/// doesn't abort the listing; a bad account shows an inline error. Pure, for testing.
+fn list_lines(accounts: &[crate::account::Account]) -> Vec<String> {
+    accounts
+        .iter()
+        .map(|a| match a.code() {
+            Ok(code) => format!("{:<24} {code}", a.name),
+            Err(e) => format!("{:<24} <error: {e}>", a.name),
+        })
+        .collect()
 }
 
 fn code(cfg: &Config, name: &str) -> Result<String> {
@@ -192,6 +206,32 @@ mod tests {
         assert!(json.contains("\"valid\":false"));
     }
 
+    /// One unparseable secret (e.g. a `{TOTP}` placeholder a vault returned
+    /// verbatim) must NOT blank the whole feed: good accounts still render and
+    /// the bad one becomes an error item naming the account.
+    #[test]
+    fn build_alfred_is_resilient_to_one_bad_secret() {
+        let mut secrets = tempfile::NamedTempFile::new().unwrap();
+        write!(
+            secrets,
+            "[good]\nsecret = GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ\n[bad]\nsecret = {{TOTP}}\n"
+        )
+        .unwrap();
+        let mut cfg = tempfile::NamedTempFile::new().unwrap();
+        write!(
+            cfg,
+            "backend = \"gauth\"\n[gauth]\npath = \"{}\"\n",
+            secrets.path().display()
+        )
+        .unwrap();
+
+        // Must be Ok (not Err) — a single bad entry can't fail the whole feed.
+        let json = build_alfred(cfg.path(), "").unwrap();
+        assert!(json.contains("\"title\":\"good\""), "good account still listed");
+        assert!(json.contains("\"title\":\"bad\""), "bad account surfaced, not dropped");
+        assert!(json.contains("Time remaining"));
+    }
+
     /// A valid gauth config yields an `{ "items": [...] }` object with the
     /// account's code as `arg` plus a trailing "Time remaining" item.
     #[test]
@@ -214,5 +254,43 @@ mod tests {
         assert!(json.contains("\"items\""));
         assert!(json.contains("\"title\":\"demo\""));
         assert!(json.contains("Time remaining"));
+    }
+
+    use crate::account::{Account, SecretMaterial};
+
+    fn good() -> Account {
+        Account {
+            name: "good".into(),
+            material: SecretMaterial::Secret("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ".into()),
+        }
+    }
+    fn bad() -> Account {
+        // A `{TOTP}` placeholder a vault returned verbatim — not valid base32.
+        Account { name: "bad".into(), material: SecretMaterial::Secret("{TOTP}".into()) }
+    }
+
+    #[test]
+    fn account_items_renders_good_and_errors_bad_without_dropping() {
+        let items = account_items(&[good(), bad()], "");
+        assert_eq!(items.len(), 2);
+        let g = items.iter().find(|i| i.title == "good").unwrap();
+        assert!(g.valid && g.arg.len() == 6);
+        let b = items.iter().find(|i| i.title == "bad").unwrap();
+        assert!(!b.valid && b.arg.is_empty() && b.subtitle.starts_with('⚠'));
+    }
+
+    #[test]
+    fn account_items_filters_by_query() {
+        let items = account_items(&[good(), bad()], "goo");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title, "good");
+    }
+
+    #[test]
+    fn list_lines_keeps_all_accounts_and_marks_bad() {
+        let lines = list_lines(&[good(), bad()]);
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].starts_with("good"));
+        assert!(lines[1].starts_with("bad") && lines[1].contains("<error:"));
     }
 }

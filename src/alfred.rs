@@ -44,6 +44,18 @@ impl Item {
             icon: icon.map(|p| Icon { path: p.to_string() }),
         }
     }
+
+    /// A non-actionable error row for an account whose code couldn't be generated
+    /// (e.g. an unparseable secret). Names the account so the user can fix the entry.
+    pub fn error(name: &str, message: &str) -> Self {
+        Item {
+            title: name.to_string(),
+            subtitle: format!("⚠ {message}"),
+            arg: String::new(),
+            valid: false,
+            icon: Some(Icon { path: "error.png".into() }),
+        }
+    }
 }
 
 /// Serialize feedback to the JSON string Alfred expects on stdout.
