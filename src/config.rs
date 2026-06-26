@@ -64,6 +64,21 @@ impl Default for MacpassConfig {
 fn default_endpoint() -> String { "http://127.0.0.1:19455".into() }
 fn default_marker_url() -> String { "gauth://".into() }
 
+/// Resolve the config path from `$XDG_CONFIG_HOME` / home dir. Pure, for testing.
+///
+/// Uses `~/.config` rather than `dirs::config_dir()`, which on macOS resolves to
+/// `~/Library/Application Support` — surprising for a CLI and inconsistent with the
+/// documented `~/.config/gauth/config.toml`. A relative `$XDG_CONFIG_HOME` is ignored
+/// per the XDG spec (the variable must hold an absolute path).
+fn config_path_from(xdg_config_home: Option<std::ffi::OsString>, home: Option<PathBuf>) -> PathBuf {
+    let base = xdg_config_home
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| home.map(|h| h.join(".config")))
+        .unwrap_or_else(|| PathBuf::from("."));
+    base.join("gauth").join("config.toml")
+}
+
 /// Expand a leading `~/` to the user's home directory.
 ///
 /// Only a leading `~/` is expanded; a bare `~` or `~user/...` is passed through literally.
@@ -77,12 +92,10 @@ pub fn expand_tilde(path: &str) -> PathBuf {
 }
 
 impl Config {
-    /// Default config file location: ~/.config/gauth/config.toml.
+    /// Default config file location: `~/.config/gauth/config.toml`
+    /// (honoring `$XDG_CONFIG_HOME`).
     pub fn default_path() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("gauth")
-            .join("config.toml")
+        config_path_from(std::env::var_os("XDG_CONFIG_HOME"), dirs::home_dir())
     }
 
     /// Load from `path`; a missing file yields defaults (zero-config gauth backend).
@@ -175,5 +188,26 @@ mod tests {
         let p = expand_tilde("~/foo");
         assert!(p.is_absolute());
         assert!(p.ends_with("foo"));
+    }
+
+    #[test]
+    fn config_path_uses_xdg_config_home_when_absolute() {
+        let p = config_path_from(Some("/tmp/xdgcfg".into()), Some("/Users/x".into()));
+        assert_eq!(p, std::path::Path::new("/tmp/xdgcfg/gauth/config.toml"));
+    }
+
+    #[test]
+    fn config_path_falls_back_to_home_dotconfig() {
+        let p = config_path_from(None, Some("/Users/x".into()));
+        assert_eq!(p, std::path::Path::new("/Users/x/.config/gauth/config.toml"));
+        // Must NOT use the macOS dirs::config_dir() location.
+        assert!(!p.to_string_lossy().contains("Library/Application Support"));
+    }
+
+    #[test]
+    fn config_path_ignores_relative_xdg() {
+        // XDG spec: a relative $XDG_CONFIG_HOME is ignored; fall back to ~/.config.
+        let p = config_path_from(Some("relative/dir".into()), Some("/Users/x".into()));
+        assert_eq!(p, std::path::Path::new("/Users/x/.config/gauth/config.toml"));
     }
 }

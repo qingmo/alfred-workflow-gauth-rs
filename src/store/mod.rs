@@ -32,11 +32,16 @@ pub trait SecretStore {
 
     /// Resolve a single account's code by name (default impl scans `list`).
     fn code(&self, name: &str) -> Result<String> {
-        self.list()?
+        let account = self
+            .list()?
             .into_iter()
             .find(|a| a.name == name)
-            .ok_or_else(|| StoreError::NotFound(name.to_string()))?
-            .code()
+            .ok_or_else(|| StoreError::NotFound(name.to_string()))?;
+        // Name the account on failure so the error is actionable.
+        account.code().map_err(|e| match e {
+            StoreError::InvalidSecret(m) => StoreError::InvalidSecret(format!("{name}: {m}")),
+            other => other,
+        })
     }
 }
 
