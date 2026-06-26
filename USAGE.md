@@ -142,12 +142,17 @@ protocol provided by the **MacPassHTTP** plugin.
 4. **Tag your TOTP entries.** For each account you want `gauth` to see, create an
    entry in MacPass and set its **URL** to the `marker_url` (`gauth://` by
    default). The entry's **title** becomes the account name. In the **password**
-   field, store either:
-   - the **base32 secret** (gauth computes the code), or
-   - a `{TOTP}` placeholder (MacPass computes the code; gauth uses it as-is).
+   field, store the **base32 secret** (the string the service shows when you enable
+   2FA) — `gauth` computes the code from it. This is the recommended, reliable path.
 
-   `gauth` distinguishes the two automatically: a bare 6-digit value is treated as
-   an already-generated code, anything else as a base32 secret.
+   `gauth` classifies each entry by its password value: a bare 6-digit number is
+   treated as an already-generated code and used as-is; anything else is treated as
+   a base32 secret. So a value that is neither — a real login password, or a literal
+   `{TOTP}`/placeholder string — will fail with `invalid TOTP secret: <name>:
+   invalid base32`. Important: KeePassHTTP's `get-logins` returns the **raw**
+   password field; it does **not** expand KeePass placeholders like `{TOTP}`. Only
+   store a 6-digit "code" value if your MacPass setup actually exposes a generated
+   TOTP through the HTTP API — otherwise store the base32 secret.
 
 5. **Verify:**
 
@@ -181,5 +186,5 @@ history) and auto-pasted — which requires granting Alfred Accessibility permis
 | `MacPass is locked …` | Unlock the MacPass database (or open one). |
 | `macpass.id/key are empty; run gauth associate first` | Run `gauth associate` and approve the dialog. |
 | `MacPass response verifier mismatch (stale key?)` | Re-run `gauth associate` to refresh the association. |
-| `invalid TOTP secret` on `add` | The secret isn't valid base32. Re-copy it from the service. |
+| `invalid TOTP secret: <name>: invalid base32` | That account's stored value isn't a base32 secret (e.g. a `{TOTP}` placeholder or a real password). Fix that entry's password. In `list`/Alfred it's shown as an error row; other accounts still work. |
 | Alfred pastes nothing | Grant Alfred Accessibility permission. |
